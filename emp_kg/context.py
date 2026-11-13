@@ -744,6 +744,7 @@ def build_context(request: ContextRequest, db_path: Path) -> ContextResult:
             if not frontier:
                 break
 
+        #Salar Change
         facts = [
             ContextFact(
                 fact_type=_fact_type(str(node.get("kind", ""))),
@@ -770,6 +771,7 @@ def build_context(request: ContextRequest, db_path: Path) -> ContextResult:
                 match_location=node.get("_match_location", {}),
             )
             for node_id, node in nodes.items()
+            if scores[node_id] >= 0.05  # Relevance filter: drop nodes with a score below the threshold
         ]
         facts.sort(key=lambda fact: (-fact.relevance_score, fact.kind, fact.name, fact.node_id))
 
@@ -787,6 +789,8 @@ def build_context(request: ContextRequest, db_path: Path) -> ContextResult:
                 tokenizer,
             )
             if used_tokens + cost > budget:
+                # Token-budget optimization: if the current fact doesn't fit, 
+                # we can check if a smaller fact exists to optimally fill capacity
                 continue
             selected.append(fact)
             used_tokens += cost
