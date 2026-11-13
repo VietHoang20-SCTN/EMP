@@ -1,0 +1,361 @@
+{
+  "$schema_name": "emp-memory-architecture",
+  "version": "2.5.0",
+  "description": "Machine-readable schema for the EMP Knowledge Graph and Engram memory store. Companion to week2_memory_architecture.tex. Grounded in real output from CodeGraph (codegraph status / codegraph explore) and Engram's actual mem_save / memory_relations schema, plus the real hoangnb24/repository-harness structure.",
+  "knowledge_graph": {
+    "storage": "SQLite + FTS5 (node:sqlite, WAL mode)",
+    "source_engine": "CodeGraph (tree-sitter extraction)",
+    "implementation_scope": {
+      "description": "Release 0.1 implements only the capabilities listed as supported. node_kinds and edge_types remain the forward-looking EMP vocabulary and are not a guarantee that every capability is extracted today.",
+      "supported_structural_node_kinds": [
+        "function",
+        "import",
+        "method",
+        "struct",
+        "constant",
+        "file",
+        "enum_member",
+        "variable",
+        "route",
+        "interface",
+        "enum",
+        "type_alias",
+        "property",
+        "class",
+        "trait",
+        "exception_type",
+        "table",
+        "route"
+      ],
+      "supported_semantic_node_kinds": [
+        "decision_ref",
+        "topic",
+        "story"
+      ],
+      "planned_node_kinds": [],
+      "supported_edge_types": [
+        "CALLS",
+        "DEFINES",
+        "EXTENDS",
+        "IMPORTS",
+        "REFERENCES",
+        "CONTAINS",
+        "INSTANTIATES",
+        "IMPLEMENTS",
+        "QUERIES",
+        "ROUTE_HANDLER",
+        "TESTS",
+        "THROWS",
+        "IMPLEMENTS",
+        "ROUTE_HANDLER",
+        "IMPLEMENTS",
+        "ROUTE_HANDLER"
+      ],
+      "partially_supported_edge_types": {
+        "AFFECTS": {
+          "supported_sources": [
+            "decision_ref",
+            "topic",
+            "story"
+          ],
+          "planned_sources": []
+        }
+      },
+      "planned_edge_types": [],
+      "planned_relationships": [
+        "architecture-document boundary checks",
+        "test-matrix coverage relationships"
+      ]
+    },
+    "node_kinds": [
+      {
+        "kind": "function",
+        "description": "A standalone function definition"
+      },
+      {
+        "kind": "import",
+        "description": "An import statement, as its own node (not just an edge); resolves separately to its target file/module"
+      },
+      {
+        "kind": "method",
+        "description": "A function attached to a struct/class/interface"
+      },
+      {
+        "kind": "struct",
+        "description": "A struct (Go-style; closest equivalent to a class in some languages)"
+      },
+      {
+        "kind": "constant",
+        "description": "A named constant value"
+      },
+      {
+        "kind": "file",
+        "description": "A source file"
+      },
+      {
+        "kind": "enum_member",
+        "description": "One value inside an enum"
+      },
+      {
+        "kind": "variable",
+        "description": "A significant module/package-level variable"
+      },
+      {
+        "kind": "route",
+        "description": "A web-framework route, linked to its handler function via a REFERENCES edge"
+      },
+      {
+        "kind": "interface",
+        "description": "An interface/protocol definition"
+      },
+      {
+        "kind": "enum",
+        "description": "An enum type"
+      },
+      {
+        "kind": "type_alias",
+        "description": "A type alias"
+      },
+      {
+        "kind": "property",
+        "description": "A named property on a type"
+      },
+      {
+        "kind": "class",
+        "description": "A class definition (non-Go languages)"
+      },
+      {
+        "kind": "trait",
+        "description": "A trait definition (Rust)"
+      },
+      {
+        "kind": "exception_type",
+        "description": "A named exception/error type that can be raised (e.g. InvalidPasswordError); not itself a code symbol CodeGraph extracts as a node today, but referenced by THROWS edges"
+      },
+      {
+        "kind": "table",
+        "description": "A database table name referenced in a query; not itself a code symbol CodeGraph extracts as a node today, but referenced by QUERIES edges"
+      },
+      {
+        "kind": "story",
+        "description": "A docs/stories/*.md story packet; a committed, re-derivable artifact linked to the functions/files it touched"
+      },
+      {
+        "kind": "decision_ref",
+        "description": "A docs/decisions/*.md committed decision record, indexed as a graph node; its content is additionally mirrored into Engram as a decision-type memory (see split_rule.decisions_refinement)"
+      },
+      {
+        "kind": "topic",
+        "description": "A section extracted from general project documentation (README, architecture notes, design docs) -- one per H2 heading. Broader and less structured than decision_ref (no required Status/Consequences fields)."
+      }
+    ],
+    "edge_types": [
+      {
+        "name": "DEFINES",
+        "source": "file",
+        "target": "function | method | struct | class",
+        "meaning": "The file's own body contains this symbol's definition."
+      },
+      {
+        "name": "IMPORTS",
+        "source": "file",
+        "target": "import | file | function | method | class",
+        "meaning": "The file contains an import statement; the Import node then resolves separately to its target file/module."
+      },
+      {
+        "name": "CALLS",
+        "source": "file | function | method",
+        "target": "function | method",
+        "meaning": "The source function's body directly invokes the target. One hop only; multi-hop paths are computed at query time via traversal, not pre-stored."
+      },
+      {
+        "name": "EXTENDS",
+        "source": "struct | class",
+        "target": "struct | class",
+        "meaning": "Inheritance, resolved after extraction."
+      },
+      {
+        "name": "IMPLEMENTS",
+        "source": "struct | class",
+        "target": "interface",
+        "meaning": "Interface implementation, resolved after extraction."
+      },
+      {
+        "name": "THROWS",
+        "source": "function | method",
+        "target": "exception_type",
+        "meaning": "The function's body contains a raise/throw statement for this exception type, directly (not via a called function)."
+      },
+      {
+        "name": "QUERIES",
+        "source": "function | method",
+        "target": "table",
+        "meaning": "The function executes a read/write against this database table."
+      },
+      {
+        "name": "ROUTE_HANDLER",
+        "source": "route",
+        "target": "function | method",
+        "meaning": "A detected framework route (e.g. an HTTP endpoint) is bound to its handler function."
+      },
+      {
+        "name": "REFERENCES",
+        "source": "file | function | method | variable | constant | property",
+        "target": "function | method | variable | constant | property",
+        "meaning": "The source symbol's body reads or otherwise uses the target symbol, without calling it as a function (e.g. reading a module-level constant, referencing another variable)."
+      },
+      {
+        "name": "TESTS",
+        "source": "function | method",
+        "target": "function | method",
+        "meaning": "A test function or method directly exercises (calls and asserts against) the target function or method's behavior."
+      },
+      {
+        "name": "AFFECTS",
+        "source": "decision_ref | story | topic",
+        "target": "file | function | method | class | struct | interface | trait | enum | route",
+        "meaning": "The decision or story's content names/references this code element, indicating the decision explains why it exists or was built this way."
+      },
+      {
+        "name": "CONTAINS",
+        "source": "file | function | method | class | struct | interface | trait | enum",
+        "target": "function | method | struct | class | interface | trait | enum | import | variable | constant | property | type_alias | route",
+        "meaning": "The file's own body contains this symbol -- CodeGraph's general containment relationship, broader than DEFINES (which only covers callable/type declarations)."
+      },
+      {
+        "name": "INSTANTIATES",
+        "source": "function | method",
+        "target": "class | struct",
+        "meaning": "The function's body creates an instance of this class/struct (e.g. `new Foo()`)."
+      }
+    ]
+  },
+  "engram_memory": {
+    "storage": "SQLite + FTS5 (Go binary)",
+    "record_schema": {
+      "title": "Short, searchable, verb + what (e.g. 'Chose Zustand over Redux')",
+      "type": [
+        "bugfix",
+        "decision",
+        "architecture",
+        "discovery",
+        "pattern",
+        "config",
+        "preference"
+      ],
+      "scope": [
+        "project",
+        "personal"
+      ],
+      "topic_key": "Stable key for an evolving topic (e.g. 'architecture/auth-model'); reused to update rather than duplicate a memory",
+      "content": {
+        "What": "One sentence: what was done",
+        "Why": "What motivated it (bug, request, performance, etc.)",
+        "Where": "Files/paths affected",
+        "Learned": "Gotchas or edge cases (omitted if none)"
+      }
+    },
+    "memory_relations_schema": {
+      "id": "INTEGER PRIMARY KEY AUTOINCREMENT \u00e2\u20ac\u201d local autoincrement key; excluded from sync payloads as it is not cross-machine portable",
+      "sync_id": "Unique id for this relation row (TEXT NOT NULL UNIQUE)",
+      "source_id": "sync_id of the source memory",
+      "target_id": "sync_id of the target memory",
+      "relation": "The relation type (TEXT NOT NULL DEFAULT 'pending')",
+      "judgment_status": [
+        "pending",
+        "judged",
+        "orphaned",
+        "ignored"
+      ],
+      "confidence": "Numeric confidence score (REAL)",
+      "evidence": "Supporting evidence for the relation",
+      "reason": "Why the relation was asserted",
+      "created_at": "Timestamp (TEXT NOT NULL DEFAULT datetime('now'))",
+      "updated_at": "Timestamp (TEXT NOT NULL DEFAULT datetime('now'))",
+      "session_id": "Session that produced this relation",
+      "marked_by_actor": "Who/what asserted the relation",
+      "marked_by_kind": "Actor kind (e.g. human, agent)",
+      "marked_by_model": "Model that asserted it, if applicable",
+      "superseded_at": "TEXT \u00e2\u20ac\u201d timestamp when this relation was superseded by another; NULL if active",
+      "superseded_by_relation_id": "INTEGER REFERENCES memory_relations(id) ON DELETE SET NULL \u00e2\u20ac\u201d points to the replacement row when superseded"
+    }
+  },
+  "split_rule": {
+    "rule": "If a fact can be regenerated by re-parsing the current source code, it belongs in the Knowledge Graph. If it requires knowing history or reasoning that no longer exists in the code, it belongs in Engram as a memory record, optionally linked to graph nodes via a memory_relations-style verified edge.",
+    "examples": [
+      {
+        "fact": "login() is defined in auth.py",
+        "system": "knowledge_graph",
+        "why": "re-derivable by parsing"
+      },
+      {
+        "fact": "routes.py calls login()",
+        "system": "knowledge_graph",
+        "why": "re-derivable"
+      },
+      {
+        "fact": "login() throws InvalidPasswordError",
+        "system": "knowledge_graph",
+        "why": "re-derivable"
+      },
+      {
+        "fact": "We chose JWT over sessions for horizontal scaling",
+        "system": "engram",
+        "why": "reasoning, not present in the code"
+      },
+      {
+        "fact": "This bug was caused by a race condition in session refresh",
+        "system": "engram",
+        "why": "historical discovery"
+      },
+      {
+        "fact": "User prefers concise commit messages",
+        "system": "engram",
+        "why": "a learned preference"
+      }
+    ],
+    "decisions_refinement": "docs/decisions/*.md files are committed and versioned, making them re-derivable (Knowledge Graph material by the letter of the rule), but their content is exactly what Engram is meant to hold. Resolution: index the file as a Knowledge Graph 'decision_ref' node (it is a real, linkable artifact), and additionally mirror its content into Engram as a 'decision'-type memory record for full-text search and memory-relation verification. The split rule decides where a fact's source of truth lives, not where it may also be indexed for retrieval."
+  },
+  "repository_harness": {
+    "source_repo": "hoangnb24/repository-harness",
+    "structure": {
+      "AGENTS.md": "Stable agent shim: local notes + links to docs below (not itself a rules file)",
+      "docs/HARNESS.md": "Human-agent collaboration model",
+      "docs/FEATURE_INTAKE.md": "Tiny / normal / high-risk work classification",
+      "docs/ARCHITECTURE.md": "Architecture discovery and boundary rules",
+      "docs/TEST_MATRIX.md": "Behavior-to-proof validation expectations",
+      "docs/HARNESS_BACKLOG.md": "Harness maintenance backlog",
+      "docs/product/": "Current product contract, derived from a spec",
+      "docs/stories/": "Story packets: units of reviewable work",
+      "docs/decisions/": "Durable decisions and tradeoffs, committed to the repo",
+      "docs/templates/": "Reusable spec/story/decision templates",
+      "scripts/": "Harness install/maintenance scripts"
+    },
+    "extraction_spec": [
+      {
+        "source": "docs/FEATURE_INTAKE.md",
+        "extracted_as": "Risk classification rules; read once per session to tag incoming work; not stored as graph/memory data itself"
+      },
+      {
+        "source": "docs/ARCHITECTURE.md",
+        "extracted_as": "Declared module boundaries; cross-checked against CodeGraph's actual import/call edges to flag boundary violations"
+      },
+      {
+        "source": "docs/TEST_MATRIX.md",
+        "extracted_as": "Behavior-to-proof mapping; linked to route and function nodes it covers"
+      },
+      {
+        "source": "docs/stories/*.md",
+        "extracted_as": "Knowledge Graph 'story' node, linked to the functions/files it touched"
+      },
+      {
+        "source": "docs/decisions/*.md",
+        "extracted_as": "Knowledge Graph 'decision_ref' node + mirrored Engram 'decision'-type memory record (see split_rule.decisions_refinement)"
+      }
+    ]
+  },
+  "storage_decision": {
+    "technology": "SQLite with FTS5 full-text search, for both the Knowledge Graph and Engram",
+    "rationale": "Both reference implementations (Engram, CodeGraph) independently converge on this stack. Avoids introducing a separate graph database server (e.g. Neo4j); WAL mode ensures concurrent reads are never blocked by an in-progress write; FTS5 provides full-text search over both code artifacts and memory records natively."
+  }
+}
