@@ -16,6 +16,7 @@ import emp_kg.context_compression as compression
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import time
+from emp_kg import benchmark, context, impact, ingest, merger, schema, semantic, source_scan, store, structural, system
 
 
 
@@ -634,6 +635,117 @@ def _run_watch(project_path: str, db_path: str | None, embeddings: str, embeddin
         observer.stop()
     observer.join()
     
+#Salar Change
+
+def _run_ingest(
+    db_path: str,
+    target_path: str,
+    embeddings_mode: str,
+    embedding_model: str,
+    as_json: bool,
+) -> None:
+    conn = store.init_db(Path(db_path))
+    try:
+        result = ingest.ingest_directory_incremental(
+            conn,
+            Path(target_path),
+            use_embeddings=(embeddings_mode == "local"),
+            embedding_model=embedding_model,
+        )
+    finally:
+        conn.close()
+    if as_json:
+        _print_json(result)
+        return
+    print(
+        f"Incremental ingest complete: {result['updated']} updated, "
+        f"{result['skipped_unchanged']} unchanged skipped, "
+        f"{result['deleted']} deleted, {result['embedded']} embedded"
+    )
+
+
+def _run_ingest_url(
+    db_path: str,
+    url: str,
+    title: str | None,
+    embeddings_mode: str,
+    embedding_model: str,
+    as_json: bool,
+) -> None:
+    conn = store.init_db(Path(db_path))
+    try:
+        result = ingest.ingest_url(
+            conn,
+            url,
+            title=title,
+            use_embeddings=(embeddings_mode == "local"),
+            embedding_model=embedding_model,
+        )
+    finally:
+        conn.close()
+    if as_json:
+        _print_json(result)
+        return
+    print(f"[{result['status']}] {result['node_id']} ({result.get('title', url)})")
+
+
+def _run_remember(
+    db_path: str,
+    text: str,
+    title: str | None,
+    tags: list[str],
+    embeddings_mode: str,
+    embedding_model: str,
+    as_json: bool,
+) -> None:
+    conn = store.init_db(Path(db_path))
+    try:
+        result = ingest.ingest_note(
+            conn,
+            text,
+            title=title,
+            tags=tags,
+            use_embeddings=(embeddings_mode == "local"),
+            embedding_model=embedding_model,
+        )
+    finally:
+        conn.close()
+    if as_json:
+        _print_json(result)
+        return
+    print(f"[{result['status']}] {result['node_id']} -> {result['title']}")
+
+
+def _run_records(
+    db_path: str,
+    action: str,
+    node_id: str | None,
+    kind: str | None,
+    limit: int,
+    as_json: bool,
+) -> None:
+    db = Path(db_path)
+    if action == "list":
+        with closing(_read_db(db_path)) as conn:
+            items = ingest.list_records(conn, kind=kind, limit=limit)
+        if as_json:
+            _print_json(items)
+            return
+        for item in items:
+            print(f"{item['id']}\t[{item['kind']}]\t{item['name']}\t({item['source_path']})")
+    elif action == "delete":
+        if not node_id:
+            raise SystemExit("--id is required when action is 'delete'")
+        conn = store.init_db(db)
+        try:
+            deleted = ingest.delete_record(conn, node_id)
+        finally:
+            conn.close()
+        if as_json:
+            _print_json({"deleted": deleted, "node_id": node_id})
+            return
+        print(f"Deleted: {node_id}" if deleted else f"Record not found: {node_id}")
+
 
 
 
@@ -799,6 +911,54 @@ def main() -> None:
         help="Output format; --json remains an alias for JSON.",
     )
     _add_read_options(context_parser)
+
+
+
+#Salar Change
+
+    ingest_parser = subparsers.add_parser(
+        "ingest", help="Incrementally ingest new/modified files without full rebuild."
+    )
+    ingest_parser.add_argument("path", help="File or directory path to ingest.")
+    ingest_parser.add_argument("--db", required=True, help="Path to graph database.")
+    ingest_parser.add_argument("--embeddings", choices=("off", "local"), default="off")
+    ingest_parser.add_argument("--embedding-model", default=DEFAULT_MODEL)
+    ingest_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    url_parser = subparsers.add_parser("ingest-url", help="Fetch and ingest a web URL into the graph.")
+    url_parser.add_argument("url", help="Target HTTP/HTTPS URL.")
+    url_parser.add_argument("--title", default=None, help="Optional custom title.")
+    url_parser.add_argument("--db", required=True, help="Path to graph database.")
+    url_parser.add_argument("--embeddings", choices=("off", "local"), default="off")
+    url_parser.add_argument("--embedding-model", default=DEFAULT_MODEL)
+    url_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    remember_parser = subparsers.add_parser(
+        "remember", help="Ingest a natural-language memory or note into the graph."
+    )
+    remember_parser.add_argument("text", help="Natural language note or fact to remember.")
+    remember_parser.add_argument("--title", default=None, help="Optional title for the note.")
+    remember_parser.add_argument("--tag", action="append", default=[], dest="tags")
+    remember_parser.add_argument("--db", required=True, help="Path to graph database.")
+    remember_parser.add_argument("--embeddings", choices=("off", "local"), default="off")
+    remember_parser.add_argument("--embedding-model", default=DEFAULT_MODEL)
+    remember_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    records_parser = subparsers.add_parser(
+        "records", help="List or delete individual knowledge records."
+    )
+    records_parser.add_argument("action", choices=("list", "delete"))
+    records_parser.add_argument("--id", default=None, dest="node_id", help="Node ID to delete.")
+    records_parser.add_argument("--kind", default=None, help="Filter list by node kind.")
+    records_parser.add_argument("--limit", type=_positive_int, default=50)
+    records_parser.add_argument("--db", required=True, help="Path to graph database.")
+    records_parser.add_argument("--json", action="store_true", dest="as_json")
+    
+    
+
+
+
+
 
     args = parser.parse_args()
 
