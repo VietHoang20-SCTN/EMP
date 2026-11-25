@@ -5,11 +5,10 @@ import io
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from emp_kg import cli, embeddings, ingest, store
+from emp_kg import cli, context, embeddings, ingest, store
 
 
 class _FakeEmbedder:
@@ -280,7 +279,9 @@ def test_cli_ingestion_commands(tmp_path: Path, monkeypatch, capsys):
     monkeypatch.setattr(
         ingest.urllib.request,
         "urlopen",
-        lambda req, timeout=20.0: _FakeHTTPResponse("<html><title>API Docs</title><body>REST v2</body></html>"),
+        lambda req, timeout=20.0: _FakeHTTPResponse(
+            "<html><title>API Docs</title><body>REST v2</body></html>"
+        ),
     )
     monkeypatch.setattr(
         sys,
@@ -308,3 +309,126 @@ def test_cli_ingestion_commands(tmp_path: Path, monkeypatch, capsys):
     cli.main()
     del_out = json.loads(capsys.readouterr().out)
     assert del_out == {"deleted": True, "node_id": note_id}
+
+
+# ---------------------------------------------------------------------------
+# 5. Retrieval & Cascade Cleanup on Ingested Notes, URLs, and Files
+# ---------------------------------------------------------------------------
+
+
+def test_retrieval_surfaces_ingested_notes_urls_and_files(
+    db_conn, tmp_path: Path, monkeypatch
+):
+    conn, db_file = db_conn
+
+    # 1. Ingest a markdown file
+    docs_dir = tmp_path / "runbooks"
+    docs_dir.mkdir()
+    (docs_dir / "bgp_policy.md").write_text(
+        "# BGP Failover Policy\nAutomatic route failover triggers within 3 seconds.",
+        encoding="utf-8",
+    )
+    ingest.ingest_directory_incremental(conn, docs_dir, use_embeddings=False)
+
+    # 2. Ingest a natural-language memory note
+    note_res = ingest.ingest_note(
+        conn,
+        "OAuth2 refresh tokens expire after 14 days and require rotation.",
+        title="Auth Token Lifecycle",
+        tags=["security", "auth"],
+        use_embeddings=False,
+    )
+
+    # 3. Ingest a web URL
+    monkeypatch.setattr(
+        ingest.urllib.request,
+        "urlopen",
+        lambda req, timeout=20.0: _FakeHTTPResponse(
+            "<html><title>Postgres HA</title><body>PgBouncer connection pooling and replica lag.</body></html>"
+        ),
+    )
+    ingest.ingest_url(
+        conn,
+        "https://example.org/postgres-ha",
+        use_embeddings=False,
+    )
+
+    # Query via context builder (BM25 + synonym expansion)
+    packet = context.build_context(
+        context.ContextRequest(
+            task_description="Investigate BGP failover routing behavior",
+            semantic_mode="off",
+            synonym_mode="auto",
+        ),
+        db_file,
+    )
+    assert len(packet.facts) >= 1
+    assert any(f.name == "bgp_policy" for f in packet.facts)
+
+    # Query targeting the remembered note
+    auth_packet = context.build_context(
+        context.ContextRequest(
+            task_description="OAuth2 refresh tokens rotation",
+            semantic_mode="off",
+        ),
+        db_file,
+    )
+    assert any(f.node_id == note_res["node_id"] for f in auth_packet.facts)
+
+    # Delete the note and verify retrieval no longer returns it
+    assert ingest.delete_record(conn, note_res["node_id"]) is True
+    after_delete_packet = context.build_context(
+        context.ContextRequest(
+            task_description="OAuth2 refresh tokens rotation",
+            semantic_mode="off",
+        ),
+        db_file,
+    )
+    assert all(f.node_id != note_res["node_id"] for f in after_delete_packet.facts)
+
+
+# ---------------------------------------------------------------------------
+# 6. Additional Edge Cases (Invalid URL, Duplicate Note, Cascade Embedding Delete)
+# ---------------------------------------------------------------------------
+
+
+def test_edge_cases_invalid_url_duplicate_note_and_cascade_delete(
+    db_conn, monkeypatch
+):
+    conn, _ = db_conn
+
+    # Invalid/unreachable URL raises URLError
+    def _failing_urlopen(req, timeout=20.0):
+        raise ingest.urllib.request.URLError("connection refused")
+
+    monkeypatch.setattr(ingest.urllib.request, "urlopen", _failing_urlopen)
+    with pytest.raises(ingest.urllib.request.URLError):
+        ingest.ingest_url(conn, "https://unreachable.invalid/docs")
+
+    # Duplicate note content shares deterministic memory URI and upserts cleanly
+    first = ingest.ingest_note(conn, "Zero-downtime schema migrations use expand-contract.")
+    second = ingest.ingest_note(conn, "Zero-downtime schema migrations use expand-contract.")
+    assert first["node_id"] == second["node_id"]
+    assert len(ingest.list_records(conn, kind="topic")) == 1
+
+    # Cascade delete removes related embedding rows cleanly
+    monkeypatch.setattr(embeddings, "SentenceTransformerEmbedder", _FakeEmbedder)
+    monkeypatch.setattr(embeddings, "validate_vectors", lambda vectors, count: None)
+    note_with_emb = ingest.ingest_note(
+        conn,
+        "Redis sentinel failover quorum requires 3 nodes.",
+        title="Redis Sentinel",
+        use_embeddings=True,
+    )
+    emb_rows_before = conn.execute(
+        "SELECT COUNT(*) FROM node_embeddings WHERE node_id = ?",
+        (note_with_emb["node_id"],),
+    ).fetchone()[0]
+    assert emb_rows_before == 1
+
+    assert ingest.delete_record(conn, note_with_emb["node_id"]) is True
+    emb_rows_after = conn.execute(
+        "SELECT COUNT(*) FROM node_embeddings WHERE node_id = ?",
+        (note_with_emb["node_id"],),
+    ).fetchone()[0]
+    assert emb_rows_after == 0
