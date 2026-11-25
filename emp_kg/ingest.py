@@ -11,7 +11,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-from emp_kg import embeddings, schema, store
+from emp_kg import embeddings, store
+from emp_kg.merger import _topic_id
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -168,7 +169,6 @@ def ingest_directory_incremental(
 
         if topics_to_upsert:
             store.save_topic_nodes(conn, topics_to_upsert)
-            from emp_kg.merger import _topic_id
             updated_node_ids = [_topic_id(t) for t in topics_to_upsert]
 
         if topics_to_upsert or deleted_ids:
@@ -222,7 +222,6 @@ def ingest_url(
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "ingestion_type": "url",
     }
-    from emp_kg.merger import _topic_id
     node_id = _topic_id(topic_record)
 
     with conn:
@@ -252,7 +251,10 @@ def ingest_note(
     c_hash = _sha256_text(clean_text)
     short_id = c_hash[:12]
     source_uri = f"memory://note/{short_id}"
-    resolved_title = title.strip() if title else (clean_text[:50] + ("..." if len(clean_text) > 50 else ""))
+    cleaned_title = title.strip() if title else ""
+    resolved_title = cleaned_title or (
+        clean_text[:50] + ("..." if len(clean_text) > 50 else "")
+    )
 
     topic_record = {
         "title": resolved_title,
@@ -263,7 +265,6 @@ def ingest_note(
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "ingestion_type": "natural_language_note",
     }
-    from emp_kg.merger import _topic_id
     node_id = _topic_id(topic_record)
 
     with conn:

@@ -19,7 +19,6 @@ import time
 from emp_kg import benchmark, context, impact, ingest, merger, schema, semantic, source_scan, store, structural, system
 
 
-
 from emp_kg.embeddings import (
     DEFAULT_MODEL,
     SentenceTransformerEmbedder,
@@ -748,8 +747,6 @@ def _run_records(
 
 
 
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="emp-kg",
@@ -912,8 +909,6 @@ def main() -> None:
     )
     _add_read_options(context_parser)
 
-
-
 #Salar Change
 
     ingest_parser = subparsers.add_parser(
@@ -1007,6 +1002,15 @@ def main() -> None:
             args.semantic_weight,
             args.encoding,
         )
+       
+    elif args.command == "ingest":
+        _run_ingest(args.db, args.path, args.embeddings, args.embedding_model, args.as_json)
+    elif args.command == "ingest-url":
+        _run_ingest_url(args.db, args.url, args.title, args.embeddings, args.embedding_model, args.as_json)
+    elif args.command == "remember":
+        _run_remember(args.db, args.text, args.title, args.tags, args.embeddings, args.embedding_model, args.as_json)
+    elif args.command == "records":
+        _run_records(args.db, args.action, args.node_id, args.kind, args.limit, args.as_json)
     elif args.command == "watch":
         _run_watch(args.project, args.db, args.embeddings, args.embedding_model)
 
