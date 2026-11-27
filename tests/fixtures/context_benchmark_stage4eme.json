@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "coverage-check",
+      "task": "coverage",
+      "expected_node_ids": [
+        "decision_ref:0008",
+        "function:314c5272dff0d257133ed0ae6e0d658b",
+        "function:e0819b5665e6632cef310ffad2eab0ab",
+        "function:721864e77904ac98fb12de8be5c4a216",
+        "file:scripts/coverage_check.py"
+      ],
+      "lane": "tiny",
+      "affected_files": ["scripts/coverage_check.py"],
+      "k": 5
+    },
+    {
+      "id": "schema-loader",
+      "task": "schema",
+      "expected_node_ids": [
+        "variable:1ea64df102754e28569c73584fe5348d",
+        "function:e5d228160f73411c017582eaae2422a2",
+        "function:618f7c8f21b167752486d61e0e5b3306",
+        "function:b36bf8be76a52618f64f6d9b7492e069",
+        "function:d66af05c0d3c40b4bfc20cd5a57e6ab2"
+      ],
+      "lane": "normal",
+      "affected_files": ["docs/schema/schema_loader.py"],
+      "k": 5
+    },
+    {
+      "id": "adr-parser",
+      "task": "parse ADR decision date status consequences",
+      "expected_node_ids": [
+        "file:scripts/adr_parser.py",
+        "function:ddbc061143fa3e95a336583d1ab2679c",
+        "function:efa96ef2c50d61d2078c5c672abdde10",
+        "function:116ca5df494d01012d9ad377d01f01f7",
+        "function:cba151d0c5190920e9d3fe2496aec496"
+      ],
+      "lane": "normal",
+      "affected_files": ["scripts/adr_parser.py"],
+      "k": 5
+    },
+    {
+      "id": "decision-ingestion",
+      "task": "post commit decision ingestion topic key upsert",
+      "expected_node_ids": [
+        "file:scripts/ingest_decisions.py",
+        "function:93a4a8812fec9f88a3da4433c1a4b9ee",
+        "function:05191bdeaf7a0c5462445367dea355e6",
+        "function:0ab8583320c90b9a84f0d1d9f367ab10",
+        "function:106f6468d1256c5fa4d03116320200a7"
+      ],
+      "lane": "normal",
+      "affected_files": ["scripts/ingest_decisions.py"],
+      "k": 5
+    },
+    {
+      "id": "memory-schema",
+      "task": "Engram memory relations record schema",
+      "expected_node_ids": [
+        "file:docs/schema/schema_loader.py",
+        "function:e5d228160f73411c017582eaae2422a2",
+        "function:b36bf8be76a52618f64f6d9b7492e069",
+        "function:fbec9ea38f7466a7e58e0f935d0e1bb2",
+        "function:3920250cb0c12a9f64548fa6514e7a6b"
+      ],
+      "lane": "normal",
+      "affected_files": ["docs/schema/schema_loader.py"],
+      "k": 5
+    },
+    {
+      "id": "codegraph-freshness",
+      "task": "CodeGraph freshness indexed files pending changes",
+      "expected_node_ids": [
+        "file:scripts/coverage_check.py",
+        "function:d9316dca9de87c232f0dec73b2a24711",
+        "function:df1f837db76dcd1fae831364dc6e3d6d",
+        "function:10d832a37acc6d855d5c672fd91baa34",
+        "function:e0819b5665e6632cef310ffad2eab0ab"
+      ],
+      "lane": "high-risk",
+      "affected_files": ["scripts/coverage_check.py"],
+      "k": 5
+    }
+  ]
+}

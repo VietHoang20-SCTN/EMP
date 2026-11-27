@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "direct-login",
+      "task": "login",
+      "expected_node_ids": ["function:login"],
+      "lane": "tiny",
+      "k": 5
+    },
+    {
+      "id": "architecture-login",
+      "task": "architecture",
+      "expected_node_ids": ["decision_ref:0001", "function:login"],
+      "lane": "normal",
+      "k": 5
+    }
+  ]
+}
